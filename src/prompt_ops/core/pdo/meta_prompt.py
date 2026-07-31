@@ -11,7 +11,6 @@ engine: dataset summarization, instruction proposal, task prompting, judging,
 and mutation prompting.
 """
 
-
 # Prompt templates for instruction generation and mutation (dataset summary + proposer)
 DATASET_DESCRIPTOR_PROMPT = """
 You are a data analyst specialized in preparing instructions for language models.

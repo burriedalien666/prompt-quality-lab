@@ -50,26 +50,16 @@ class TestDatasetFieldValidation:
                 # Adapt the dataset
                 result = adapter.adapt()
 
-                # Check that we got an error log with helpful message
-                assert any(
-                    "contains a dict but should be a string" in record.message
-                    for record in caplog.records
-                ), "Expected error message about dict field not found in logs"
+            # Check that the error identifies the bad mapping and gives the fix.
+            messages = [record.getMessage() for record in caplog.records]
+            assert any("FIELD MAPPING ERROR" in message for message in messages)
+            assert any("nested path" in message for message in messages)
 
-                assert any(
-                    "Did you mean to specify a nested path" in record.message
-                    for record in caplog.records
-                ), "Expected hint about nested paths not found in logs"
-
-                # Check that the value was JSON-stringified as a fallback
-                assert len(result) == 1
-                assert "inputs" in result[0]
-                # The dict should have been stringified
-                question_value = result[0]["inputs"]["question"]
-                assert isinstance(question_value, str)
-                # It should be a JSON string of the dict
-                parsed = json.loads(question_value)
-                assert parsed == {"input": "What is the capital of France?"}
+            # The adapter preserves the nested fields and selects the first
+            # string value as the standard DSPy question field.
+            assert len(result) == 1
+            assert result[0]["inputs"]["input"] == "What is the capital of France?"
+            assert result[0]["inputs"]["question"] == "What is the capital of France?"
 
         finally:
             Path(temp_path).unlink()

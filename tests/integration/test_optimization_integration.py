@@ -1,6 +1,4 @@
-import json
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,23 +30,13 @@ def get_optimization_skip_reason():
 class TestOptimizationIntegration:
     """Integration tests for the optimization process."""
 
-    def test_llama_strategy_run(self, facility_prompt_path, mock_model_response):
+    def test_llama_strategy_run(self, facility_prompt_path):
         """Test the BasicOptimizationStrategy run method."""
         # Read the system prompt
         with open(facility_prompt_path, "r") as f:
             system_prompt = f.read()
 
-        # Create a mock model
-        mock_model = MagicMock()
-        mock_model.generate.return_value = mock_model_response
-
-        # Create the strategy with the mock model
-        strategy = BasicOptimizationStrategy(model=mock_model)
-
-        # Mock the base_strategy.run method to return a dictionary
-        mock_result = {"prompt": "Optimized prompt", "score": 0.9}
-        strategy.base_strategy = MagicMock()
-        strategy.base_strategy.run.return_value = mock_result
+        strategy = BasicOptimizationStrategy()
 
         # Prepare prompt data
         prompt_data = {
@@ -63,12 +51,11 @@ class TestOptimizationIntegration:
 
         # Check results
         assert result is not None
-        assert isinstance(result, dict)
-        assert result == mock_result
+        assert isinstance(result, str)
+        assert result.startswith("[Optimized for llama-3]")
+        assert system_prompt in result
 
-    def test_dataset_based_optimization(
-        self, facility_dataset_path, mock_model_response
-    ):
+    def test_dataset_based_optimization(self, facility_dataset_path):
         """Test optimization using a dataset."""
         # Create adapter
         adapter = ConfigurableJSONAdapter(
@@ -80,19 +67,11 @@ class TestOptimizationIntegration:
         # Load a small sample
         adapter.load_raw_data()  # Load all data
         examples = adapter.adapt()  # Adapt loaded data
+        assert examples
 
-        # Create mock components
-        mock_model = MagicMock()
-        mock_model.generate.return_value = mock_model_response
         metric = FacilityMetric()
 
-        # Create strategy with mocked base_strategy
-        strategy = BasicOptimizationStrategy(model=mock_model, metric=metric)
-
-        # Mock the base_strategy
-        mock_result = {"prompt": "Optimized prompt", "score": 0.8}
-        strategy.base_strategy = MagicMock()
-        strategy.base_strategy.run.return_value = mock_result
+        strategy = BasicOptimizationStrategy(metric=metric)
 
         # Prepare prompt data
         prompt_data = {
@@ -107,12 +86,10 @@ class TestOptimizationIntegration:
 
         # Check results
         assert result is not None
-        assert isinstance(result, dict)
-        assert result == mock_result
+        assert isinstance(result, str)
+        assert prompt_data["text"] in result
 
-    def test_end_to_end_optimization_flow(
-        self, facility_dataset_path, mock_model_response
-    ):
+    def test_end_to_end_optimization_flow(self, facility_dataset_path):
         """Test the complete optimization flow from dataset to optimized prompt."""
         # Create adapter
         adapter = ConfigurableJSONAdapter(
@@ -124,21 +101,11 @@ class TestOptimizationIntegration:
         # Load a small sample
         adapter.load_raw_data()  # Load all data
         examples = adapter.adapt()  # Adapt loaded data
+        assert examples
 
-        # Create mock model
-        mock_model = MagicMock()
-        mock_model.generate.return_value = mock_model_response
-
-        # Create metric
         metric = FacilityMetric()
 
-        # Create strategy with mocked base_strategy
-        strategy = BasicOptimizationStrategy(model=mock_model, metric=metric)
-
-        # Mock the base_strategy
-        mock_result = {"prompt": "Optimized prompt for end-to-end test", "score": 0.9}
-        strategy.base_strategy = MagicMock()
-        strategy.base_strategy.run.return_value = mock_result
+        strategy = BasicOptimizationStrategy(metric=metric)
 
         # Prepare prompt data
         prompt_data = {
@@ -153,10 +120,8 @@ class TestOptimizationIntegration:
 
         # Check results
         assert result is not None
-        assert isinstance(result, dict)
-        assert "prompt" in result
-        assert "score" in result
-        assert result["score"] == 0.9
+        assert isinstance(result, str)
+        assert prompt_data["text"] in result
 
         # Test saving the prompt to a simple file
         import tempfile
@@ -167,12 +132,12 @@ class TestOptimizationIntegration:
         ) as tmp_file:
             tmp_path = tmp_file.name
             # Write the prompt directly to the file
-            tmp_file.write(result["prompt"])
+            tmp_file.write(result)
 
         # Verify the saved file
         with open(tmp_path, "r") as f:
             saved_content = f.read()
-            assert saved_content == result["prompt"]
+            assert saved_content == result
 
         # Clean up
         os.unlink(tmp_path)

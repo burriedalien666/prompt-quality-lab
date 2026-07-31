@@ -1,0 +1,4 @@
+{"id":"zh-refund","expected":"退款申请已通过","actual":"退款申请已通过"}
+{"id":"zh-delivery","expected":"预计明天下午送达","actual":"预计明天送达"}
+{"id":"en-password","expected":"Reset link sent","actual":"Reset link sent"}
+{"id":"json-routing","expected":"{\"intent\":\"refund\",\"priority\":\"high\"}","actual":"{\"intent\":\"refund\",\"priority\":\"high\"}"}

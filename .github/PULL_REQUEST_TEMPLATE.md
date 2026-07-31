@@ -1,10 +1,20 @@
-# What does this PR do?
-[Provide a short summary of what this PR does and why. Link to relevant issues if applicable.]
+## 改动说明
 
-[//]: # (If resolving an issue, uncomment and update the line below)
-[//]: # (Closes #[issue-number])
+<!-- 说明要解决的问题，以及为什么选择这个方案。关联 Issue 时填写 Closes #编号。 -->
 
-## Test Plan
-[Describe the tests you ran to verify your changes with result summaries. *Provide clear instructions so the plan can be easily re-executed.*]
+## 验证结果
 
-[//]: # (## Documentation)
+<!-- 列出实际运行过的命令和结果，不要只写“测试通过”。 -->
+
+```text
+pytest ...
+结果：
+```
+
+## 兼容性检查
+
+- [ ] 没有改变 CLI 参数、报告字段或退出码
+- [ ] 如有行为变化，已先添加失败测试并同步文档
+- [ ] 示例数据已经脱敏，不含密钥或真实业务标识
+- [ ] 已更新 `CHANGELOG.md`（纯内部重构可不更新）
+- [ ] 已保留上游版权和 MIT License 声明

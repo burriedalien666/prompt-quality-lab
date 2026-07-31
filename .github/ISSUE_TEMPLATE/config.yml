@@ -1,6 +1,8 @@
 blank_issues_enabled: false
-
 contact_links:
-  - name: Have you read the docs?
-    url: https://github.com/meta-llama/prompt-ops/blob/main/README.md
-    about: Much help can be found in the README and documentation
+  - name: 使用说明
+    url: https://github.com/burriedalien666/prompt-quality-lab#readme
+    about: 提交问题前请先查看安装、输入格式和质量门禁说明
+  - name: 安全问题
+    url: https://github.com/burriedalien666/prompt-quality-lab/security
+    about: 涉及密钥、隐私数据或漏洞时请先查看安全报告说明

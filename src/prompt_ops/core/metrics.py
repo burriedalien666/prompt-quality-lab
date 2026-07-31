@@ -564,10 +564,10 @@ class FacilityMetric(MetricBase):
             Either a dictionary containing metric scores (if trace=True) or a single float score
         """
         # Extract ground truth using a priority-based approach
-        ground_truth = extract_value(gold, self.output_field)
+        ground_truth = extract_value(gold, self.output_field, gold)
 
         # Extract prediction value
-        prediction_value = extract_value(pred, "answer") or pred
+        prediction_value = extract_value(pred, "answer", pred)
 
         # Get the full evaluation results
         results = self.evaluate(ground_truth, prediction_value, **kwargs)
@@ -745,10 +745,10 @@ class StandardJSONMetric(MetricBase):
             Either a dictionary containing metric scores (if trace=True) or a single float score
         """
         # Extract ground truth using a priority-based approach
-        ground_truth = extract_value(gold, self.output_field)
+        ground_truth = extract_value(gold, self.output_field, gold)
 
         # Extract prediction value
-        prediction_value = extract_value(pred, "answer") or pred
+        prediction_value = extract_value(pred, "answer", pred)
 
         # Get the full evaluation results
         results = self.evaluate(ground_truth, prediction_value, trace=trace, **kwargs)

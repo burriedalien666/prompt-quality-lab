@@ -19,7 +19,6 @@ def extract_value(obj: Any, key: str, default: Any = None) -> Any:
     - Objects with direct attributes
     - Dictionary-like objects
     - Prediction objects (with text attribute)
-    - Any object with string representation
 
     Args:
         obj: The object to extract from (can be a DSPy Example, dict, object, etc.)
@@ -60,9 +59,5 @@ def extract_value(obj: Any, key: str, default: Any = None) -> Any:
     # Text attribute (Prediction objects)
     if hasattr(obj, "text"):
         return obj.text
-
-    # Fallback to string representation
-    if hasattr(obj, "__str__") and not isinstance(obj, (str, bytes, bytearray)):
-        return str(obj)
 
     return default

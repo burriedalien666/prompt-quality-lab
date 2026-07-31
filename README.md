@@ -1,207 +1,191 @@
-<h1 align="center"> Prompt Ops </h1>
+# Prompt Quality Lab
 
-### 🎉 New: Prompt Duel Optimizer (PDO) Published!
+[![CI](https://github.com/burriedalien666/prompt-quality-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/burriedalien666/prompt-quality-lab/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-We've published a new paper on **PDO (Prompt Duel Optimizer)** - an efficient label-free prompt optimization method using dueling bandits and Thompson sampling. PDO achieves state-of-the-art results on BIG-bench Hard and MS MARCO benchmarks.
+一个面向 LLM 输出的离线质量评测工具：把模型输出保存为 JSONL，就能比较候选版本与基线版本，并在质量下降时让 CI 失败。
 
-📄 **Read the paper:** [LLM Prompt Duel Optimizer: Efficient Label-Free Prompt Optimization](https://www.arxiv.org/abs/2510.13907) (arXiv:2510.13907)
+项目当前处于 `0.1.x` 实验阶段。现有主线专注于三件事：结果可复现、中文评测可用、质量门禁能直接接入工程流程。
 
-🧪 **Try it yourself:** Check out the [Web of Lies use case](use-cases/web-of-lies-pdo/) demonstrating PDO on logical reasoning tasks
+## 为什么做这个项目
 
-⭐ **Star this repo** and follow along - we'll be publishing a detailed tutorial notebook soon!
+Prompt 改了几句话、模型版本升级，或者推理参数换了一组，输出都可能悄悄退化。人工抽查很难稳定复现，在线评测又会受 API 费用、网络和模型波动影响。
 
----
+Prompt Quality Lab 把“生成”和“评分”拆开：模型输出只需保存一次，之后可以在本地反复评测，不需要 API Key，也不会再次调用模型。它适合放在提交前检查或 CI 中，回答一个简单问题：**这次改动至少没有比基线更差吗？**
 
-## What is prompt-ops?
-<p align="center">
-  <a href="https://pypi.org/project/prompt-ops/"><img src="https://img.shields.io/pypi/v/prompt-ops.svg" /></a>
-</p>
-<p align="center">
-  <a href="https://llama.developer.meta.com/?utm_source=prompt-ops&utm_medium=readme&utm_campaign=main"><img src="https://img.shields.io/badge/Llama_API-Join_Waitlist-brightgreen?logo=meta" /></a>
-  <a href="https://llama.developer.meta.com/docs?utm_source=prompt-ops&utm_medium=readme&utm_campaign=main"><img src="https://img.shields.io/badge/Llama_API-Documentation-4BA9FE?logo=meta" /></a>
+适合的场景：
 
-</p>
+- Prompt 或模型版本变更后的回归检查
+- 中文客服、问答、摘要等文本输出的离线比较
+- 小型评测集的可复现实验
+- 需要以退出码阻止低质量版本合并的 CI 流程
 
-<p align="center">
-  <a href="https://github.com/meta-llama/llama-models/blob/main/models/?utm_source=prompt-ops&utm_medium=readme&utm_campaign=main"><img alt="Llama Model cards" src="https://img.shields.io/badge/Llama_OSS-Model_cards-green?logo=meta" /></a>
-  <a href="https://www.llama.com/docs/overview/?utm_source=prompt-ops&utm_medium=readme&utm_campaign=main"><img alt="Llama Documentation" src="https://img.shields.io/badge/Llama_OSS-Documentation-4BA9FE?logo=meta" /></a>
-  <a href="https://huggingface.co/meta-llama"><img alt="Hugging Face meta-llama" src="https://img.shields.io/badge/Hugging_Face-meta--llama-yellow?logo=huggingface" /></a>
+暂时不适合：
 
-</p>
-<p align="center">
-  <a href="https://github.com/meta-llama/synthetic-data-kit"><img alt="Llama Tools Syntethic Data Kit" src="https://img.shields.io/badge/Llama_Tools-synthetic--data--kit-orange?logo=meta" /></a>
-  <a href="https://github.com/meta-llama/prompt-ops"><img alt="Llama Tools Syntethic Data Kit" src="https://img.shields.io/badge/Llama_Tools-prompt--ops-orange?logo=meta" /></a>
-    <a href="https://github.com/meta-llama/llama-cookbook"><img alt="Llama Cookbook" src="https://img.shields.io/badge/Llama_Cookbook-llama--cookbook-orange?logo=meta" /></a>
-</p>
+- 代替人工评审开放式创作质量
+- 直接运行大模型推理或托管评测数据
+- 把字符重合度当作事实正确性的完整判断
 
+## 五分钟跑通
 
-
-prompt-ops is a Python package that **automatically optimizes prompts** for Llama models. It transforms prompts that work well with other LLMs into prompts that are optimized for LLM models, improving performance and reliability.
-
-**Key Benefits:**
-- **No More Trial and Error**: Stop manually tweaking prompts to get better results
-- **Fast Optimization**: Get model-optimized prompts in minutes with template-based optimization
-- **Data-Driven Improvements**: Use your own examples to create prompts that work for your specific use case
-- **Measurable Results**: Evaluate prompt performance with customizable metrics
-
-## Requirements
-
-To get started with prompt-ops, you'll need:
-
-- Existing System Prompt: Your existing system prompt that you want to optimize
-- Existing Query-Response Dataset: A JSON file containing query-response pairs (as few as 50 examples) for evaluation and optimization (see [prepare your dataset](#preparing-your-data) below)
-- Configuration File: A YAML configuration file (config.yaml) specifying model hyperparameters, and optimization details (see [example configuration](configs/facility-simple.yaml))
-
-## How It Works
-
-```
-┌──────────────────────────┐  ┌──────────────────────────┐  ┌────────────────────┐
-│  Existing System Prompt  │  │  set(query, responses)   │  │ YAML Configuration │
-└────────────┬─────────────┘  └─────────────┬────────────┘  └───────────┬────────┘
-             │                              │                           │
-             │                              │                           │
-             ▼                              ▼                           ▼
-         ┌────────────────────────────────────────────────────────────────────┐
-         │                     prompt-ops migrate                       │
-         └────────────────────────────────────────────────────────────────────┘
-                                            │
-                                            │
-                                            ▼
-                                ┌──────────────────────┐
-                                │   Optimized Prompt   │
-                                └──────────────────────┘
-```
-
-### Simple Workflow
-
-1. **Start with your existing system prompt**: Take your existing system prompt that works with other LLMs (see [example prompt](use-cases/facility-support-analyzer/facility_prompt_sys.txt))
-2. [**Prepare your dataset**](#preparing-your-data): Create a JSON file with query-response pairs for evaluation and optimization
-3. **Configure optimization**: Set up a simple YAML file with your dataset and preferences (see [example configuration](configs/facility-simple.yaml))
-4. [**Run optimization**](#step-4-run-optimization): Execute a single command to transform your prompt
-5. [**Get results**](#prompt-transformation-example): Receive a model-optimized prompt with performance metrics
-
-
-## Real-world Results
-
-### HotpotQA
-<table>
-<tr>
-<td width="100%"><img src="./docs/_static/output-hotpotqa.png" onerror="this.onerror=null;this.src='https://github.com/user-attachments/assets/52080f54-d1ca-4d21-8263-a9b2ee1d3c10'" alt="HotpotQA Benchmark Results"></td>
-</tr>
-</table>
-
-These results were measured on the [HotpotQA multi-hop reasoning benchmark](https://hotpotqa.github.io/), which tests a model's ability to answer complex questions requiring information from multiple sources. Our optimized prompts showed substantial improvements over baseline prompts across different model sizes.
-
-
-## Quick Start (5 minutes)
-
-### Step 1: Installation
-
-> **Note:** We recommend installing from source as we are currently transitioning package names on PyPI. This ensures you get the latest stable version without any naming conflicts.
+要求 Python 3.10 或更高版本。
 
 ```bash
-# Create a virtual environment
-conda create -n prompt-ops python=3.10
-conda activate prompt-ops
-
-# Recommended: Install from source
-git clone https://github.com/meta-llama/prompt-ops.git
-cd prompt-ops
-pip install -e .
-
-# Alternative: Install from PyPI (may have naming transition issues, still on version 0.0.7)
-# pip install llama-prompt-ops
-
+git clone https://github.com/burriedalien666/prompt-quality-lab.git
+cd prompt-quality-lab
+python -m venv .venv
 ```
 
-### Step 2: Create a sample project
+Windows PowerShell：
 
-This will create a directory called my-project with a sample configuration and dataset in the current folder.
+```powershell
+.venv\Scripts\Activate.ps1
+python -m pip install -e .
+```
+
+macOS / Linux：
 
 ```bash
-prompt-ops create my-project
-cd my-project
+source .venv/bin/activate
+python -m pip install -e .
 ```
 
-### Step 3: Set Up Your API Key
-
-Add your API key to the `.env` file:
+运行仓库自带的中英文示例：
 
 ```bash
-OPENROUTER_API_KEY=your_key_here
+pqlab evaluate examples/quality/candidate.jsonl --baseline examples/quality/baseline.jsonl --gate-metric character_f1 --min-score 0.90 --min-improvement 0
 ```
 
-prompt-ops uses LiteLLM as a unified API client. LiteLLM automatically detects the provider from your model name (e.g., `openrouter/model`, `groq/model`) and looks for the corresponding provider-specific environment variable (`OPENROUTER_API_KEY`, `GROQ_API_KEY`, etc.). For more inference provider options, see [Inference Providers](./docs/inference_providers.md).
+预期结果：
 
-### Step 4: Run Optimization
-The optimization will take about 5 minutes.
-
-```bash
-prompt-ops migrate # defaults to config.yaml if --config not specified
+```text
+Quality report
+Samples: 4
+Exact match: 0.7500
+Token F1: 0.7500
+Character F1: 0.9643
+Gate metric: Character F1
+Status: PASS
+Exact match delta: +0.7500
+Token F1 delta: +0.5500
+Character F1 delta: +0.2265
 ```
 
-Done! The optimized prompt will be saved to the `results` directory with performance metrics comparing the original and optimized versions.
+这里的数值来自仓库内四条演示数据，只用于说明评测流程，不代表通用模型基准。具体样本和逐条结果见 [examples/quality](examples/quality/README.md)。
 
-To read more about this use case, we go into more detail in [Basic Tutorial](./docs/basic/readme.md).
+## 输入格式
 
-
-### Prompt Transformation Example
-
-Below is an example of a transformed system prompt from proprietary LM to Llama:
-
-| Original Proprietary LM Prompt | Optimized Llama Prompt |
-| --- | --- |
-| You are a helpful assistant. Extract and return a JSON with the following keys and values:<br><br>1. "urgency": one of `high`, `medium`, `low`<br>2. "sentiment": one of `negative`, `neutral`, `positive`<br>3. "categories": Create a dictionary with categories as keys and boolean values (True/False), where the value indicates whether the category matches tags like `emergency_repair_services`, `routine_maintenance_requests`, etc.<br><br>Your complete message should be a valid JSON string that can be read directly. | You are an expert in analyzing customer service messages. Your task is to categorize the following message based on urgency, sentiment, and relevant categories.<br><br>Analyze the message and return a JSON object with these fields:<br><br>1. "urgency": Classify as "high", "medium", or "low" based on how quickly this needs attention<br>2. "sentiment": Classify as "negative", "neutral", or "positive" based on the customer's tone<br>3. "categories": Create a dictionary with facility management categories as keys and boolean values<br><br>Only include these exact keys in your response. Return a valid JSON object without code blocks, prefixes, or explanations. |
-
-
-## Preparing Your Data
-
-To use prompt-ops for prompt optimization, you'll need to prepare a dataset with your prompts and expected responses. The standard format is a JSON file structured like this:
+输入文件采用 JSONL：一行一个 JSON 对象，至少包含 `expected` 和 `actual`。建议提供稳定的 `id`，便于定位失败样本。
 
 ```json
-[
-    {
-        "question": "Your input query here",
-        "answer": "Expected response here"
-    },
-    {
-        "question": "Another input query",
-        "answer": "Another expected response"
-    }
-]
+{"id":"zh-refund","expected":"退款申请已通过","actual":"退款申请通过"}
+{"id":"en-password","expected":"Reset link sent","actual":"Reset sent"}
 ```
 
-If your data matches this format, you can use the built-in [`StandardJSONAdapter`](src/prompt_ops/core/datasets.py) which will handle it automatically.
+字段名可以替换：
 
-### Custom Data Formats
+```bash
+pqlab evaluate outputs.jsonl --expected-field reference --actual-field response --id-field case_id
+```
 
-If your data is formatted differently, and there isn't a built-in dataset adapter, you can create a custom dataset adapter by extending the `DatasetAdapter` class. See the [Dataset Adapter Selection Guide](docs/dataset_adapter_selection_guide.md) for more details.
+格式错误、缺少字段或基线与候选样本数不同都会返回非零退出码，并给出所在行或错误原因。
 
-## Multiple Inference Provider Support
+## 三个确定性指标
 
-prompt-ops supports various inference providers and endpoints to fit your infrastructure needs. See our [detailed guide on inference providers](./docs/inference_providers.md) for configuration examples with:
+| 指标 | 计算方式 | 更适合 |
+| --- | --- | --- |
+| `exact_match` | 忽略大小写和多余空白后完全相同 | 标签、短答案、固定格式 |
+| `token_f1` | 按空白切词，计算词项重合的 F1 | 英文句子、已有分词文本 |
+| `character_f1` | 移除空白后按 Unicode 字符计算 F1 | 中文、日文及无空格短文本 |
 
-- OpenRouter (cloud-based API)
-- vLLM (local deployment)
-- NVIDIA NIMs (optimized containers)
+中文句子通常没有词间空格。例如“退款申请已通过”和“退款申请通过”在 `token_f1` 下会被视为两个完全不同的 token，而 `character_f1` 能反映它们的大部分字符仍然重合。这也是本项目默认示例选择字符级门禁的原因。
 
-## Documentation and Examples
+这些指标全部是确定性的，同一份输入会得到同一份结果。它们适合回归检测，但不能单独证明回答真实、无偏或安全。
 
-For more detailed information, check out these resources:
+## 配置质量门禁
 
-- [Quick Start Guide](docs/basic/readme.md): Get up and running with prompt-ops in 5 minutes
-- [Intermediate Configuration Guide](docs/intermediate/readme.md): Learn how to configure datasets, metrics, and optimization strategies
-- [Dataset Adapter Selection Guide](docs/dataset_adapter_selection_guide.md): Choose the right adapter for your dataset format
-- [Metric Selection Guide](docs/metric_selection_guide.md): Select appropriate evaluation metrics for your use case
-- [Inference Providers Guide](docs/inference_providers.md): Configure different model providers and endpoints
+`--gate-metric` 决定哪一个指标用于判定通过与否：
 
-## Acknowledgements
-This project leverages some of awesome open source projects including [DSPy](https://github.com/stanfordnlp/dspy), thanks to the team for the inspiring work!
+```bash
+# 候选字符 F1 至少达到 0.90
+pqlab evaluate candidate.jsonl --gate-metric character_f1 --min-score 0.90
 
-## Contributing
+# 候选字符 F1 不得低于基线
+pqlab evaluate candidate.jsonl --baseline baseline.jsonl --gate-metric character_f1 --min-improvement 0
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+# 要求相比基线至少提升 0.02
+pqlab evaluate candidate.jsonl --baseline baseline.jsonl --gate-metric character_f1 --min-improvement 0.02
+```
+
+门禁不通过时命令退出码为 `1`。输入文件无效时同样返回非零退出码，因此可以直接交给 CI 判断。
+
+生成机器可读报告：
+
+```bash
+pqlab evaluate candidate.jsonl --baseline baseline.jsonl --format json --output quality-report.json
+```
+
+JSON 报告包含聚合分数、逐条分数、基线差值、门禁配置、`passed` 状态和失败原因。
+
+## 接入 GitHub Actions
+
+仓库自己的 CI 就使用同一条命令。项目中可以加入如下步骤：
+
+```yaml
+- name: Run offline LLM quality gate
+  run: >-
+    pqlab evaluate
+    examples/quality/candidate.jsonl
+    --baseline examples/quality/baseline.jsonl
+    --gate-metric character_f1
+    --min-score 0.90
+    --min-improvement 0
+```
+
+这一步不访问模型服务，也不需要在仓库 Secrets 中保存模型密钥。
+
+## 上游优化能力
+
+本仓库保留了 Meta prompt-ops 的 Prompt 优化模块。只做离线评测时不安装重型模型依赖；需要使用原有优化流程时再安装可选依赖：
+
+```bash
+python -m pip install -e ".[optimize]"
+prompt-ops migrate --config configs/facility-simple.yaml
+```
+
+优化流程可能需要模型服务和对应的 API Key，离线 `pqlab evaluate` 不需要。
+
+## 项目结构
+
+```text
+src/prompt_ops/core/quality.py     核心指标与基线比较
+src/prompt_ops/interfaces/cli.py  命令行入口
+tests/unit/test_quality*.py       评测与 CLI 回归测试
+examples/quality/                 可直接运行的中英文样本
+.github/workflows/ci.yml          格式、测试和质量门禁
+```
+
+## 项目来源与改动边界
+
+Prompt Quality Lab 是 [Meta prompt-ops](https://github.com/meta-llama/prompt-ops) 的下游工程扩展，继续使用原项目的 MIT License，并保留上游代码中的版权声明。
+
+本仓库新增和重点维护的部分包括：
+
+- JSONL 离线评测命令与 JSON / 文本报告
+- Exact Match、Token F1 和面向中文的 Character F1
+- 基线回归、绝对阈值和 CI 退出码
+- 无重型 AI 依赖的评测安装路径
+- 中文使用文档、示例和维护流程
+
+更详细的来源说明见 [NOTICE](NOTICE)。这一区分很重要：仓库不会把上游已有能力包装成本项目原创成果。
+
+## 后续计划
+
+近期优先级是结构化 JSON 输出、失败样本摘要和更严格的基线样本对齐。完整计划见 [ROADMAP.md](ROADMAP.md)。
+
+如果你想提交问题或改动，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。维护方式和版本检查清单记录在 [MAINTAINERS.md](MAINTAINERS.md)。
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+本项目使用 [MIT License](LICENSE)。上游归属信息见 [NOTICE](NOTICE)。

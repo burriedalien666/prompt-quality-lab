@@ -1,4 +1,3 @@
-recursive-include src/prompt_ops *.py
-recursive-include src/prompt_ops/interfaces *.py
-recursive-include src/prompt_ops/core *.py
-recursive-include src/prompt_ops/templates *
+include LICENSE
+include NOTICE
+recursive-include src/prompt_ops/templates *.json *.txt

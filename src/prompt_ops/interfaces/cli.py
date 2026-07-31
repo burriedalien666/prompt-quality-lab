@@ -34,6 +34,13 @@ try:
 except ImportError:
     LITELLM_AVAILABLE = False
 
+from prompt_ops.core.quality import (
+    SUPPORTED_GATE_METRICS,
+    compare_evaluations,
+    evaluate_records,
+    load_records,
+)
+
 # Import template utilities
 from prompt_ops.templates import get_template_content, get_template_path
 
@@ -117,28 +124,204 @@ def echo_flush(message, err=False):
         sys.stdout.flush()
 
 
-from prompt_ops.core.datasets import DatasetAdapter, load_dataset
-from prompt_ops.core.metrics import (
-    DSPyMetricAdapter,
-    MetricBase,
-    StandardJSONMetric,
-)
-from prompt_ops.core.migrator import PromptMigrator
-from prompt_ops.core.model import setup_model
-from prompt_ops.core.prompt_strategies import (
-    BaseStrategy,
-    BasicOptimizationStrategy,
-    OptimizationError,
-    PDOStrategy,
-)
+# These symbols are kept as module attributes for backwards-compatible test
+# patching, but their AI-heavy modules are imported only by optimization paths.
+DatasetAdapter = None
+load_dataset = None
+DSPyMetricAdapter = None
+MetricBase = None
+StandardJSONMetric = None
+PromptMigrator = None
+setup_model = None
+BaseStrategy = None
+BasicOptimizationStrategy = None
+OptimizationError = None
+PDOStrategy = None
+
+_AI_SYMBOLS = {
+    "DatasetAdapter": ("prompt_ops.core.datasets", "DatasetAdapter"),
+    "load_dataset": ("prompt_ops.core.datasets", "load_dataset"),
+    "DSPyMetricAdapter": ("prompt_ops.core.metrics", "DSPyMetricAdapter"),
+    "MetricBase": ("prompt_ops.core.metrics", "MetricBase"),
+    "StandardJSONMetric": ("prompt_ops.core.metrics", "StandardJSONMetric"),
+    "PromptMigrator": ("prompt_ops.core.migrator", "PromptMigrator"),
+    "setup_model": ("prompt_ops.core.model", "setup_model"),
+    "BaseStrategy": ("prompt_ops.core.prompt_strategies", "BaseStrategy"),
+    "BasicOptimizationStrategy": (
+        "prompt_ops.core.prompt_strategies",
+        "BasicOptimizationStrategy",
+    ),
+    "OptimizationError": (
+        "prompt_ops.core.prompt_strategies",
+        "OptimizationError",
+    ),
+    "PDOStrategy": ("prompt_ops.core.prompt_strategies", "PDOStrategy"),
+}
+
+
+def _get_ai_symbol(name):
+    """Import and cache an AI-dependent CLI symbol on first use."""
+    value = globals()[name]
+    if value is None:
+        module_name, attribute_name = _AI_SYMBOLS[name]
+        value = getattr(importlib.import_module(module_name), attribute_name)
+        globals()[name] = value
+    return value
 
 
 @click.group()
 def cli():
-    """
-    prompt-ops - A tool for migrating and optimizing prompts for any LLM.
-    """
+    """Prompt Quality Lab - offline LLM evaluation and prompt optimization."""
     pass
+
+
+def _render_quality_text(report):
+    """Render a compact human-readable quality report."""
+    metric_labels = {
+        "exact_match": "Exact match",
+        "token_f1": "Token F1",
+        "character_f1": "Character F1",
+    }
+    gate_metric = report["gate"]["metric"]
+    lines = [
+        "Quality report",
+        f"Samples: {report['samples']}",
+        f"Exact match: {report['exact_match']:.4f}",
+        f"Token F1: {report['token_f1']:.4f}",
+        f"Character F1: {report['character_f1']:.4f}",
+        f"Gate metric: {metric_labels[gate_metric]}",
+        f"Status: {'PASS' if report['passed'] else 'FAIL'}",
+    ]
+    if report["delta"] is not None:
+        lines.extend(
+            [
+                f"Exact match delta: {report['delta']['exact_match']:+.4f}",
+                f"Token F1 delta: {report['delta']['token_f1']:+.4f}",
+                f"Character F1 delta: {report['delta']['character_f1']:+.4f}",
+            ]
+        )
+    lines.extend(f"FAIL: {failure}" for failure in report["failures"])
+    return "\n".join(lines)
+
+
+@cli.command(name="evaluate")
+@click.argument(
+    "outputs",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+)
+@click.option(
+    "--baseline",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    default=None,
+    help="Optional JSONL output file used as the regression baseline.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Report format.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Optional path to save the rendered report.",
+)
+@click.option("--expected-field", default="expected", show_default=True)
+@click.option("--actual-field", default="actual", show_default=True)
+@click.option("--id-field", default="id", show_default=True)
+@click.option(
+    "--gate-metric",
+    type=click.Choice(SUPPORTED_GATE_METRICS),
+    default="token_f1",
+    show_default=True,
+    help="Metric used for the absolute and baseline quality gates.",
+)
+@click.option(
+    "--min-score",
+    type=click.FloatRange(min=0.0, max=1.0),
+    default=None,
+    help="Require the selected gate metric to reach this absolute score.",
+)
+@click.option(
+    "--min-improvement",
+    type=click.FloatRange(min=-1.0, max=1.0),
+    default=0.0,
+    show_default=True,
+    help="Required token F1 improvement over the baseline.",
+)
+def evaluate(
+    outputs,
+    baseline,
+    output_format,
+    output_path,
+    expected_field,
+    actual_field,
+    id_field,
+    gate_metric,
+    min_score,
+    min_improvement,
+):
+    """Evaluate LLM outputs from a deterministic JSONL file."""
+    try:
+        candidate_records = load_records(
+            outputs,
+            expected_field=expected_field,
+            actual_field=actual_field,
+            id_field=id_field,
+        )
+        candidate_report = evaluate_records(
+            candidate_records,
+            expected_field=expected_field,
+            actual_field=actual_field,
+            id_field=id_field,
+        )
+        baseline_report = None
+        if baseline:
+            baseline_records = load_records(
+                baseline,
+                expected_field=expected_field,
+                actual_field=actual_field,
+                id_field=id_field,
+            )
+            baseline_report = evaluate_records(
+                baseline_records,
+                expected_field=expected_field,
+                actual_field=actual_field,
+                id_field=id_field,
+            )
+        report = compare_evaluations(
+            candidate_report,
+            baseline=baseline_report,
+            gate_metric=gate_metric,
+            min_score=min_score,
+            min_improvement=min_improvement,
+        )
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if output_format == "json":
+        rendered = json.dumps(report, indent=2, ensure_ascii=False)
+    else:
+        rendered = _render_quality_text(report)
+
+    if output_path:
+        try:
+            Path(output_path).write_text(rendered + "\n", encoding="utf-8")
+        except OSError as exc:
+            raise click.ClickException(
+                f"Could not write report to {output_path}: {exc}"
+            ) from exc
+
+    click.echo(rendered)
+    if output_path and output_format == "text":
+        click.echo(f"Report written to: {output_path}")
+
+    if not report["passed"]:
+        raise click.exceptions.Exit(1)
 
 
 @cli.command(name="create")
@@ -358,6 +541,9 @@ def load_class_dynamically(class_path):
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
 
+            dataset_adapter_class = _get_ai_symbol("DatasetAdapter")
+            metric_base_class = _get_ai_symbol("MetricBase")
+
             # Find all classes in the module that inherit from our base classes
             candidates = []
             for name, obj in vars(module).items():
@@ -365,9 +551,10 @@ def load_class_dynamically(class_path):
                     continue
 
                 # Check if it's a subclass of one of our base classes
-                if (issubclass(obj, DatasetAdapter) and obj != DatasetAdapter) or (
-                    issubclass(obj, MetricBase) and obj != MetricBase
-                ):
+                if (
+                    issubclass(obj, dataset_adapter_class)
+                    and obj != dataset_adapter_class
+                ) or (issubclass(obj, metric_base_class) and obj != metric_base_class):
                     candidates.append((name, obj))
 
             # If we found exactly one candidate, use it
@@ -486,7 +673,7 @@ def get_dataset_adapter_from_config(config_dict, config_path):
     return get_dataset_adapter(config_dict)
 
 
-def validate_min_records_in_dataset(dataset_adapter: DatasetAdapter):
+def validate_min_records_in_dataset(dataset_adapter: Any):
     # The dataset must contain at least 4 records to avoid runtime errors during optimization.
     # This is because the data is split into 25% training, 25% validation, and 50% testing.
     data = dataset_adapter.load_raw_data()
@@ -507,6 +694,7 @@ def get_models_from_config(config_dict, override_model_name=None, api_key=None):
         tuple: (task_model, proposer_model, task_model_name, proposer_model_name)
     """
     model_config = config_dict.get("model", {})
+    model_setup = _get_ai_symbol("setup_model")
 
     # Check optimization strategy to determine appropriate adapter type
     optimization_config = config_dict.get("optimization", {})
@@ -539,7 +727,7 @@ def get_models_from_config(config_dict, override_model_name=None, api_key=None):
         proposer_model_name = model_config.get("proposer_model", default_model)
 
     # Create task model
-    task_model = setup_model(
+    task_model = model_setup(
         model_name=task_model_name,
         adapter_type=adapter_type,
         api_base=api_base,
@@ -557,7 +745,7 @@ def get_models_from_config(config_dict, override_model_name=None, api_key=None):
         click.echo(
             f"Using different models - Task: {task_model_name}, Proposer: {proposer_model_name}"
         )
-        proposer_model = setup_model(
+        proposer_model = model_setup(
             model_name=proposer_model_name,
             adapter_type=adapter_type,
             api_base=api_base,
@@ -583,9 +771,10 @@ def get_model_from_config(config_dict, override_model_name=None, api_key=None):
         A configured model adapter instance
     """
     model_config = config_dict.get("model", {})
+    model_setup = _get_ai_symbol("setup_model")
     adapter_type = model_config.get("adapter_type", "dspy")
 
-    return setup_model(
+    return model_setup(
         model_name=(
             override_model_name
             if override_model_name
@@ -626,6 +815,9 @@ def get_strategy(
     Returns:
         A strategy instance appropriate for the model and configuration
     """
+    basic_strategy_class = _get_ai_symbol("BasicOptimizationStrategy")
+    pdo_strategy_class = _get_ai_symbol("PDOStrategy")
+
     # Extract just the model name without provider path
     model_name = model_name_with_path.split("/")[-1]
 
@@ -642,7 +834,7 @@ def get_strategy(
                 if k not in ["strategy"]  # Exclude non-parameter keys
             }
 
-            strategy = BasicOptimizationStrategy(
+            strategy = basic_strategy_class(
                 model_name=model_name,
                 metric=metric,
                 task_model=task_model,
@@ -664,7 +856,7 @@ def get_strategy(
                 if k not in ["strategy"]  # Exclude non-parameter keys
             }
 
-            strategy = PDOStrategy(
+            strategy = pdo_strategy_class(
                 model_name=model_name,
                 metric=metric,
                 task_model=task_model,
@@ -693,7 +885,7 @@ def get_strategy(
         if k not in ["type", "strategy"]  # Exclude non-parameter keys
     }
 
-    strategy = BasicOptimizationStrategy(
+    strategy = basic_strategy_class(
         model_name=model_name,
         metric=metric,
         task_model=task_model,
@@ -718,6 +910,8 @@ def get_metric(config, model):
     Returns:
         A metric instance
     """
+    dspy_metric_class = _get_ai_symbol("DSPyMetricAdapter")
+
     # Default metric class map for convenience
     METRIC_CLASS_MAP = {
         "similarity": "prompt_ops.core.metrics.DSPyMetricAdapter",
@@ -734,11 +928,11 @@ def get_metric(config, model):
         metric_type = metric_config.get("type", "similarity")
         if metric_type == "similarity":
             click.echo("Using similarity metric")
-            return DSPyMetricAdapter(model=model, signature_name="similarity")
+            return dspy_metric_class(model=model, signature_name="similarity")
         elif metric_type == "custom":
             # For backward compatibility with custom metrics
             click.echo("Using custom metric configuration")
-            return DSPyMetricAdapter(
+            return dspy_metric_class(
                 model=model,
                 input_mapping=metric_config.get("input_mapping", {}),
                 output_fields=metric_config.get("output_fields", []),
@@ -767,7 +961,7 @@ def get_metric(config, model):
             }
 
             # Create and return the metric instance
-            if metric_class == DSPyMetricAdapter:
+            if metric_class == dspy_metric_class:
                 # DSPyMetricAdapter requires the model parameter
                 return metric_class(model=model, **metric_params)
             else:
@@ -839,6 +1033,9 @@ def migrate(config, model, output_dir, save_yaml, api_key_env, dotenv_path, log_
     Example:
         prompt-ops migrate --config configs/facility.yaml
     """
+    prompt_migrator_class = _get_ai_symbol("PromptMigrator")
+    optimization_error_class = _get_ai_symbol("OptimizationError")
+
     # Set up logging
     numeric_level = getattr(logging, log_level.upper())
     logging.basicConfig(
@@ -946,7 +1143,7 @@ def migrate(config, model, output_dir, save_yaml, api_key_env, dotenv_path, log_
     )
 
     # Create migrator
-    migrator = PromptMigrator(
+    migrator = prompt_migrator_class(
         strategy=strategy, task_model=task_model, prompt_model=prompt_model
     )
 
@@ -1050,7 +1247,7 @@ def migrate(config, model, output_dir, save_yaml, api_key_env, dotenv_path, log_
                     click.echo(f"YAML output file: {yaml_file_path}")
             else:
                 raise
-    except OptimizationError as e:
+    except optimization_error_class as e:
         click.echo(f"\nOptimization failed: {str(e)}", err=True)
         click.echo("No optimized prompt was generated.")
         sys.exit(1)

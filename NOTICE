@@ -1,0 +1,16 @@
+Prompt Quality Lab
+
+This repository contains software derived from Meta prompt-ops:
+https://github.com/meta-llama/prompt-ops
+
+The upstream source remains under the MIT License and retains its original
+copyright notices. The LICENSE file in this repository is preserved from the
+upstream project.
+
+Downstream work maintained in this repository includes the offline JSONL
+evaluation command, deterministic quality reports, baseline regression gates,
+Unicode character-level F1, CI integration, examples, and Chinese project
+documentation.
+
+No claim is made that upstream prompt optimization modules were authored by
+this downstream project.

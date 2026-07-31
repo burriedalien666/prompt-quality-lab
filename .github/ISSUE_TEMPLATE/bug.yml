@@ -1,61 +1,61 @@
-name: 🐛 Bug Report
-description: Report a bug to help us improve prompt-ops
+name: Bug 报告
+description: 提交可以稳定复现的错误
 labels: ["bug"]
 body:
-  - type: markdown
+  - type: checkboxes
+    id: checks
     attributes:
-      value: >
-        Thanks for taking the time to report a bug! Please search [existing issues](https://github.com/meta-llama/prompt-ops/issues) first to avoid duplicates.
-
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue，没有发现相同问题
+          required: true
+        - label: 我提供的日志和样本已经脱敏
+          required: true
   - type: textarea
-    id: bug-description
+    id: description
     attributes:
-      label: What happened?
-      description: A clear description of the bug and what you expected to happen instead.
-      placeholder: |
-        I was trying to optimize prompts using the facility dataset, but...
-
-        Expected: The optimization should complete successfully
-        Actual: Got an error about missing configuration
+      label: 问题描述
+      description: 说明实际发生了什么，以及你原本期望什么。
     validations:
       required: true
-
   - type: textarea
     id: reproduction
     attributes:
-      label: How to reproduce
-      description: Steps to reproduce the issue, including any commands or code.
-      placeholder: |
-        1. Run `prompt-ops optimize --config configs/facility.yaml`
-        2. See error...
-
-        ```bash
-        # Your command here
-        ```
+      label: 最小复现步骤
+      description: 请提供可复制的命令和最小 JSONL 样本。
+      render: shell
     validations:
       required: true
-
   - type: textarea
-    id: environment
+    id: output
     attributes:
-      label: Environment
-      description: Your Python version and any relevant system info.
-      placeholder: |
-        - Python version: 3.9.0
-        - prompt-ops version: 0.0.8
-        - OS: macOS 14.0
+      label: 实际输出
+      description: 粘贴完整错误信息或退出码，请删除密钥和隐私数据。
+      render: text
     validations:
-      required: false
-
-  - type: textarea
-    id: error-logs
+      required: true
+  - type: input
+    id: version
     attributes:
-      label: Error logs (if any)
-      description: Paste any error messages or stack traces.
-      placeholder: |
-        ```
-        Traceback (most recent call last):
-          ...
-        ```
+      label: 版本或提交
+      placeholder: 例如 0.1.0 或 git commit SHA
     validations:
-      required: false
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      placeholder: 例如 3.11.9
+    validations:
+      required: true
