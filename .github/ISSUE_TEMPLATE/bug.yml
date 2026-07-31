@@ -1,0 +1,61 @@
+name: 🐛 Bug Report
+description: Report a bug to help us improve prompt-ops
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for taking the time to report a bug! Please search [existing issues](https://github.com/meta-llama/prompt-ops/issues) first to avoid duplicates.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected to happen instead.
+      placeholder: |
+        I was trying to optimize prompts using the facility dataset, but...
+
+        Expected: The optimization should complete successfully
+        Actual: Got an error about missing configuration
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: Steps to reproduce the issue, including any commands or code.
+      placeholder: |
+        1. Run `prompt-ops optimize --config configs/facility.yaml`
+        2. See error...
+
+        ```bash
+        # Your command here
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your Python version and any relevant system info.
+      placeholder: |
+        - Python version: 3.9.0
+        - prompt-ops version: 0.0.8
+        - OS: macOS 14.0
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: Error logs (if any)
+      description: Paste any error messages or stack traces.
+      placeholder: |
+        ```
+        Traceback (most recent call last):
+          ...
+        ```
+    validations:
+      required: false

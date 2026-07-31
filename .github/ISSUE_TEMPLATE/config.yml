@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Have you read the docs?
+    url: https://github.com/meta-llama/prompt-ops/blob/main/README.md
+    about: Much help can be found in the README and documentation

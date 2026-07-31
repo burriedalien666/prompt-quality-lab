@@ -1,0 +1,35 @@
+name: 🚀 Feature Request
+description: Suggest a new feature for prompt-ops
+labels: ["enhancement"]
+body:
+- type: textarea
+  id: feature-description
+  attributes:
+    label: What feature would you like?
+    description: A clear description of the feature you'd like to see.
+    placeholder: |
+      I'd like to be able to...
+
+      This would help with...
+  validations:
+    required: true
+
+- type: textarea
+  id: use-case
+  attributes:
+    label: What's your use case?
+    description: How would you use this feature? What problem does it solve?
+    placeholder: |
+      I'm working on optimizing prompts for customer support and need...
+  validations:
+    required: true
+
+- type: textarea
+  id: additional-context
+  attributes:
+    label: Additional context
+    description: Any other details, examples, or screenshots that might help.
+    placeholder: |
+      Here's an example of what I'm trying to achieve...
+  validations:
+    required: false
