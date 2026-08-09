@@ -27,7 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 optimize = [
     "requests>=2.25.0",
-    "dspy==2.6.13",
+    "dspy==3.3.0",
     "numpy>=2.2.0",
     "scipy>=1.15.0",
     "pandas>=2.2.0",
